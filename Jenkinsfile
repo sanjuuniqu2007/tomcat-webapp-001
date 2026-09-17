@@ -2,13 +2,12 @@ pipeline {
 
     agent any
 
-    stages {
+    environment {
+        TOMCAT_URL = 'http://13.206.89.87:8080'
+        APP_NAME = 'jenkins-tomcat-app'
+    }
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
+    stages {
 
         stage('Build') {
             steps {
@@ -27,15 +26,35 @@ pipeline {
                 sh 'ls -lh target/*.war'
             }
         }
+
+        stage('Deploy to Tomcat') {
+            steps {
+                withCredentials([
+                    usernamePassword(
+                        credentialsId: 'tomcat-credentials',
+                        usernameVariable: 'TOMCAT_USER',
+                        passwordVariable: 'TOMCAT_PASSWORD'
+                    )
+                ]) {
+
+                    sh '''
+                        curl --fail \
+                        -u "$TOMCAT_USER:$TOMCAT_PASSWORD" \
+                        --upload-file target/jenkins-tomcat-app-1.0.war \
+                        "$TOMCAT_URL/manager/text/deploy?path=/jenkins-tomcat-app&update=true"
+                    '''
+                }
+            }
+        }
     }
 
     post {
         success {
-            echo 'Maven build completed successfully!'
+            echo 'Build and deployment successful!'
         }
 
         failure {
-            echo 'Build failed!'
+            echo 'Build or deployment failed!'
         }
     }
 }
